@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+// Leave VITE_API_URL unset for local development so Vite's `/api` proxy is used.
+// Set it to the deployed API origin when the frontend is hosted separately.
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('auramart_token');
