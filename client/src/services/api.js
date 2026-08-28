@@ -1,10 +1,34 @@
 // Leave VITE_API_URL unset for local development so Vite's `/api` proxy is used.
 // Set it to the deployed API origin when the frontend is hosted separately.
-const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+// The backend mounts every endpoint under `/api`, so add that path when an
+// origin is supplied while still accepting a value that already ends in `/api`.
+const configuredApiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+const API_BASE = configuredApiUrl
+  ? `${configuredApiUrl.endsWith('/api') ? configuredApiUrl : `${configuredApiUrl}/api`}`
+  : '/api';
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('auramart_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const parseApiResponse = async (res) => {
+  const contentType = res.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      `The API returned ${contentType || 'an unknown response type'} (HTTP ${res.status}). ` +
+      'Check that VITE_API_URL points to the backend service.'
+    );
+  }
+
+  const payload = await res.json();
+
+  if (!res.ok) {
+    throw new Error(payload.message || `API request failed (HTTP ${res.status})`);
+  }
+
+  return payload;
 };
 
 export const api = {
@@ -15,7 +39,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async register(name, email, password, role = 'customer') {
@@ -24,31 +48,31 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password, role })
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getProfile() {
     const res = await fetch(`${API_BASE}/auth/profile`, {
       headers: { ...getAuthHeader() }
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   // Products
   async getProducts(params = {}) {
     const query = new URLSearchParams(params).toString();
     const res = await fetch(`${API_BASE}/products${query ? `?${query}` : ''}`);
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getProductById(id) {
     const res = await fetch(`${API_BASE}/products/${id}`);
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getCategories() {
     const res = await fetch(`${API_BASE}/products/categories/all`);
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async createProduct(formData) {
@@ -57,7 +81,7 @@ export const api = {
       headers: { ...getAuthHeader() },
       body: formData // FormData will set multipart/form-data boundary automatically
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async updateProduct(id, formData) {
@@ -66,7 +90,7 @@ export const api = {
       headers: { ...getAuthHeader() },
       body: formData // FormData will set multipart/form-data boundary automatically
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async deleteProduct(id) {
@@ -74,7 +98,7 @@ export const api = {
       method: 'DELETE',
       headers: { ...getAuthHeader() }
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async addReview(productId, reviewData) {
@@ -86,7 +110,7 @@ export const api = {
       },
       body: JSON.stringify(reviewData)
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   // Orders
@@ -99,21 +123,21 @@ export const api = {
       },
       body: JSON.stringify(orderData)
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getMyOrders() {
     const res = await fetch(`${API_BASE}/orders/my-orders`, {
       headers: { ...getAuthHeader() }
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getAllOrders() {
     const res = await fetch(`${API_BASE}/orders/all`, {
       headers: { ...getAuthHeader() }
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async updateOrderStatus(orderId, status) {
@@ -125,7 +149,7 @@ export const api = {
       },
       body: JSON.stringify({ status })
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   // Users (Admin only)
@@ -133,7 +157,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/auth/users`, {
       headers: { ...getAuthHeader() }
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   // AI Services
@@ -143,7 +167,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, conversationHistory: history })
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async smartSearch(query) {
@@ -152,7 +176,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query })
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async generateProductCopy(payload) {
@@ -164,16 +188,16 @@ export const api = {
       },
       body: JSON.stringify(payload)
     });
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getOutfitBundle(productId) {
     const res = await fetch(`${API_BASE}/ai/bundle/${productId}`);
-    return res.json();
+    return parseApiResponse(res);
   },
 
   async getReviewSummary(productId) {
     const res = await fetch(`${API_BASE}/ai/review-summary/${productId}`);
-    return res.json();
+    return parseApiResponse(res);
   }
 };
